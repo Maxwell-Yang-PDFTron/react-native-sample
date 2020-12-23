@@ -1,21 +1,84 @@
-import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, {Component} from 'react';
+import {Platform, View, PermissionsAndroid} from 'react-native';
+const {RNPdftron} = require('react-native-pdftron');
+import HomeScreen from './src/HomeScreen';
+import DocumentViewer from './src/DocumentViewer';
 
-export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
+type AppStates = {
+  onHomeScreen: boolean,
+  document: string,
+  permissionGranted: boolean,
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default class App extends Component<{}, AppStates> {
+  constructor(props : {}) {
+    super(props);
+
+    this.state = {
+      onHomeScreen: true,
+      document: '',
+      permissionGranted: Platform.OS === 'ios' ? true : false,
+    };
+
+    RNPdftron.initialize('');
+  }
+
+  componentDidMount() {
+    if (Platform.OS === 'android') {
+      this.requestStoragePermission();
+    }
+  }
+
+  async requestStoragePermission() {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+      );
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        this.setState({
+          permissionGranted: true,
+        });
+        console.log('Storage permission granted');
+      } else {
+        this.setState({
+          permissionGranted: false,
+        });
+        console.log('Storage permission denied');
+      }
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  openDocument = (filePath : string) => {
+    console.log('Opening document with url', filePath);
+    this.setState({
+      document: filePath,
+      onHomeScreen: false,
+    });
+  };
+
+  exitViewer = () => {
+    console.log('Viewer exited');
+    this.setState({
+      onHomeScreen: true,
+    });
+  };
+
+  render() {
+    if (this.state.permissionGranted) {
+      if (this.state.onHomeScreen) {
+        return <HomeScreen openDocument={this.openDocument.bind(this)} />;
+      } else {
+        return (
+          <DocumentViewer
+            exitViewer={this.exitViewer.bind(this)}
+            filePath={this.state.document}
+          />
+        );
+      }
+    } else {
+      return <View></View>;
+    }
+  }
+}
